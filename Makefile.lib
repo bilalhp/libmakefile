@@ -49,7 +49,7 @@
 #   20190104 - add soname support
 #   20190701 - do not override depends-y
 #   20190702 - fix depends-y for subdirs
-#   20190806 - fix parallel compilation of subdirs
+#   20190806 - fix parallel compilation of ${target}_depends-y
 
 #
 # Example
@@ -685,6 +685,12 @@ define target-defaults_base
     $(eval $1_depends_m    = $(subst ../,__UPDIR__/,$($1_depends_m)))
     $(eval $1_objects_m    = $(subst ../,__UPDIR__/,$($1_objects_m)))
 
+    $(eval $1_objects      = $($1_objects_c))
+    $(eval $1_objects     += $($1_objects_cc))
+    $(eval $1_objects     += $($1_objects_cpp))
+    $(eval $1_objects     += $($1_objects_moc))
+    $(eval $1_objects     += $($1_objects_m))
+
     $(eval $1_directories  = $(sort $(dir .$1/ $($1_objects_c) $($1_objects_cpp) $($1_objects_m) $($1_objects_moc))))
 
     $(eval $1_depends      = $(MAKEFILE_LIST) $($1_depends_c) $($1_depends_cc) $($1_depends_cpp) $($1_depends_m) $($1_depends_moc))
@@ -728,7 +734,9 @@ define target-defaults_base
 	$(do_cp)
 	$(do_print_deps)
 
-    .$1/$1: $($1_depends_y) $($1_objects_c) $($1_objects_cc) $($1_objects_cpp) $($1_objects_moc) $($1_objects_m) $($1_objects_e)
+    .NOTPARALLEL: $($1_depends_y) $($1_objects_e) $($1_objects)
+
+    .$1/$1: $($1_depends_y) $($1_objects_e) $($1_objects)
 
     $1_clean: __FORCE
 	$(do_clean) $1 .$1 $$@.cmd $1.dSYM $($1_headers_uic)
@@ -867,22 +875,21 @@ endef
 
 define subdir_empty-defaults
     $(addsuffix _$2, $1): __FORCE
-	@+ $(MAKE) $($1_makeflags-y) -C '$$(subst _$2,,$$@)' $2
+	${Q}+ $(MAKE) $($1_makeflags-y) -C '$$(subst _$2,,$$@)' $2
 endef
 
 define subdir-defaults
     subdirs += $1
 
-    .NOTPARALLEL: $1
     $1: $1_all
 	$(do_print_deps)
 
     $(addsuffix _all, $1): $($1_depends-y) __FORCE
-	@+ $(MAKE) $($1_makeflags-y) -C '$$(subst _all,,$$@)' all
+	${Q}+ $(MAKE) $($1_makeflags-y) -C '$$(subst _all,,$$@)' all
 	$(do_print_deps)
 
     $(addsuffix _clean, $1): __FORCE
-	@+ $(MAKE) $($1_makeflags-y) -C '$$(subst _clean,,$$@)' clean
+	${Q}+ $(MAKE) $($1_makeflags-y) -C '$$(subst _clean,,$$@)' clean
 endef
 
 define dist-defaults
