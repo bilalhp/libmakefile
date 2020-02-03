@@ -1,7 +1,7 @@
 #
 # Makefile.lib4c
 #
-# version   : 3.2.3
+# version   : 3.2.4
 # copyright : 2002 - 2020 by Alper Akcan
 # email     : alper.akcan@gmail.com
 #
@@ -24,6 +24,7 @@
 #   20190806 - fix parallel compilation of ${target}_depends-y
 #   20200130 - dist and install support
 #   20200203 - add 'distclean' target and add uniq to all foreach
+#   20200204 - fix depends .d generation with subdir dependencies
 
 #
 # Example
@@ -422,12 +423,12 @@ define target-defaults_base
     $($1_directories):
 	$(do_mkdir) $($1_directories)
 
-    $($1_depends_c):   $($1_headers_c)
+    $($1_depends_c): $($1_sources_c) $($1_headers_c)
 
-    $($1_objects_c):   .$1/%.o: .$1/%.d $(MAKEFILE_LIST)
-    $($1_objects_e):   $(MAKEFILE_LIST)
+    $($1_objects_c): .$1/%.o: .$1/%.d $(MAKEFILE_LIST)
+    $($1_objects_e): $(MAKEFILE_LIST)
 
-    $(target-depends): $(filter-out $(target-builds) $($1_depends), $($1_depends_y))
+    $(target-depends): $(filter %.c, $($1_depends_y)) $(filter %.h, $($1_depends_y))
 
     $1: .$1/$1 $(MAKEFILE_LIST)
 	$(do_cp)
@@ -439,6 +440,7 @@ define target-defaults_base
 
     $1_clean: __FORCE
 	$(do_clean) $1 .$1 $$@.cmd $1.dSYM
+	$(do_print_deps)
 
     $1_distclean: __FORCE
 endef
@@ -447,6 +449,7 @@ define target-defaults-rule
     $(eval source = $(patsubst $3,$4,$(subst __UPDIR__/,../,$2)))
     $2: ${source} $(MAKEFILE_LIST)
 	$5
+	$(do_print_deps)
 endef
 
 define target-defaults
@@ -534,11 +537,13 @@ define target_empty-defaults
 
     $(addsuffix _clean, $1): __FORCE
 	$(do_clean) $1 .$1 $$@.cmd
+	$(do_print_deps)
 endef
 
 define subdir_empty-defaults
     $(addsuffix _$2, $1): __FORCE
 	${Q}+ $(MAKE) $($1_makeflags-y) -C '$$(subst _$2,,$$@)' $2
+	$(do_print_deps)
 endef
 
 define subdir-defaults
@@ -663,6 +668,7 @@ all: $(target-builds)
 all: $(target-dists)
 all: $(target.extra-y)
 all: __FORCE
+	$(do_print_deps)
 	@true
 
 install: $(addsuffix _install, $(subdirs))
